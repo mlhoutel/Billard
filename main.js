@@ -1,131 +1,194 @@
-document.addEventListener("DOMContentLoaded", function() {
+var system
+
+var cwidth = window.screen.width - 100
+var cheight = window.screen.height - 200
+
+var reset;
+var pause;
+var paused = false;
+
+function setup() {
+	createCanvas(cwidth, cheight)
+
+	textSize(15);
+
+	reset = createButton('&#8634;');
+	reset.position(cwidth - 35, 10);
+	reset.style("height","40px")
+	reset.style("width","40px")
+	reset.style("font-size: 2em")
+	reset.mousePressed(Reset);
+
+	pause = createButton('&#10074;&#10074;');
+	pause.position(cwidth - 80, 10);
+	pause.style("height","40px")
+	pause.style("width","40px")
+	pause.style("font-size: 1.5em")
+	pause.mousePressed(Pause);
+
+	Reset()
+}
+
+function Pause() {
+	if (paused) {
+		paused = false
+		pause.elt.innerHTML = '&#10074;&#10074;'
+	} else {
+		paused = true
+		pause.elt.innerHTML = '&#9658;'
+	}
+}
+
+function Reset() {
+	system = new System()
+
+	var colors = ['white','grey','orange','green','blue','yellow','black','red','purple','magenta','brown','black']
 	
-	var canvas = document.getElementById('canvas');
-	var width = canvas.width;
-	var height = canvas.height; 
+	system.add(new Body(200, 300, 10, 0, colors[0]))
 
-	if (canvas.getContext)
+	let c = 1;
+	for (let i = 0; i < 4; i++)
 	{
-		var context = canvas.getContext('2d');
-		
-		balls = [];
-		colors = ['white','grey','orange','green','blue','yellow','black','red','purple','magenta','brown','black']
-
-		//Player Ball
-		ball = {'x': 200,
-				'y': 300,
-				'vx': Math.random()*50 + 5,
-				'vy': (Math.random()*10)-5,
-				'friction': 0.02,
-				'size': 25,
-				'color': colors[0]};
-
-		balls.push(ball);
-
-		//Others Balls
-		let c = 1;
-		for (let i = 0; i < 4; i++)
+		for (let j = 0; j <= i; j++)
 		{
-			for (let j = 0; j <= i; j++)
-			{			
-				ball = {'x': 400+i*70,
-						'y': 300+(-i/2)*70+(j*70),
-						'vx': 0,
-						'vy': 0,
-						'friction': 0.02,
-						'size': 25,
-						'color': colors[c]};
-				c = c + 1;
-				balls.push(ball);
+			system.add(new Body(400+i*70, 300+(-i/2)*70+(j*70), 0, 0, colors[c]))
+			c = c + 1;
+		}
+	}
+
+	system.setTupples()
+}
+
+function RandomInt(max) {
+	return Math.floor(Math.random() * Math.floor(max));
+}
+function randomColor() {
+	return [RandomInt(255),RandomInt(255),RandomInt(255)]
+}
+
+function draw() {
+	background(0);
+
+	system.Step()
+	system.Draw()
+}
+
+function System() {
+	this.bodies = []
+	this.tupples = []
+
+	this.setTupples = function() {
+		for (var i = 0; i < this.bodies.length; i++) {
+			for (var j = 0; j < this.bodies.length; j++) {
+				if (i != j && !this.tuppleExist(this.bodies[i], this.bodies[j]))
+				{
+					this.tupples.push([this.bodies[i], this.bodies[j]])
+				}
 			}
 		}
+	}
 
-		//Draw
-		setInterval(function(){
-
-			//Background
-			context.clearRect(0,0,width,height);
-			context.fillStyle = '#E6E6EA';
-			context.fillRect(0,0,width,height);
-
-			//Ball Display
-			for (let ball of balls)
-			{
-				update(ball,width,height,balls);
-
-				var cercle = new Path2D();
-		    	cercle.arc(ball['x'], ball['y'], ball['size'], 0, 2 * Math.PI);
-		    	context.fillStyle = ball['color'];
-		    	context.fill(cercle);
-
-		    	//Vector
-		    	context.strokeStyle = 'red';
-		    	context.lineWidth = 5;
-		    	context.beginPath();
-				context.moveTo(ball['x'], ball['y']);
-				context.lineTo(ball['x'] + ball['vx'] * 6, ball['y'] + ball['vy'] * 6);
-				context.stroke();
+	this.tuppleExist = function(bodyA, bodyB) {
+		let exist = false
+		for (var i = 0; i < this.tupples.length; i++) {
+			if ((this.tupples[i][0] == bodyA && this.tupples[i][1] == bodyB) || (this.tupples[i][1] == bodyA && this.tupples[i][0] == bodyB)) {
+				exist = true
 			}
-		}, 10);
-
-	}
-	else
-	{
-		alert("Canvas non supporté sur ce navigateur");
-		return;
-	}
-});
-
-
-function update(ball, width, height, balls) {
-
-	//Coord
-	ball['x'] = ball['x'] + ball['vx'];
-	ball['y'] = ball['y'] + ball['vy'];
-
-	//Frict
-	ball['vx'] = ball['vx']*(1-ball['friction']);
-	ball['vy'] = ball['vy']*(1-ball['friction']);
-
-	//Collision Walls
-	if (ball['x']+ball['size']>= width || ball['x']-ball['size'] <= 0)
-	{
-		ball['vx']=-ball['vx'];
+		}
+		return exist
 	}
 
-	if (ball['y']+ball['size'] >= height || ball['y']-ball['size'] <= 0)
-	{
-		ball['vy']=-ball['vy'];
-	}
+	this.Step = function() {
 
-	//Collision Balls
-	for (let bal of balls)
-	{
-		if (bal != ball)
+		if (!paused)
 		{
-			//Distances
-			var dx = ball['x'] - bal['x'];
-			var dy = ball['y'] - bal['y'];
+			for (var i = 0; i < this.bodies.length; i++) {
+				this.bodies[i].Step()
+			}
+			for (var i = 0; i < this.tupples.length; i++) {
+				this.tupples[i][0].BCollision(this.tupples[i][1])
+			}
+		}
+	}
 
-			var distance = Math.sqrt(dx * dx + dy * dy);
-			var r = ball['size'] + bal['size'];
-			
-			//If collision
-			if (distance <= r)
-			{
-				let dvx = bal['vx']-ball['vx'];
-				let dvy = bal['vy']-ball['vy'];
+	this.Draw = function() {
 
-				let dot = dx * dvx + dy * dvy;
+		strokeWeight(3)
 
-				if (dot >= 0)
-				{
-					let factor = dot/Math.pow(distance,2);
-					ball['vx'] += factor * dx;
-					ball['vy'] += factor * dy;
-					bal['vx'] -= factor * dx;
-					bal['vy'] -= factor * dy;
-				}				
+		for (var i = 0; i < this.bodies.length; i++) {
+			this.bodies[i].Draw()
+		}
+	}
+
+	this.add = function(body) {
+		this.bodies.push(body)
+	}
+}
+
+
+function Body(x, y, x_speed, y_speed, color) {
+	this.x = x
+	this.y = y
+
+	this.x_speed = x_speed
+	this.y_speed = y_speed
+
+	this.size = 25
+	this.mass = 10
+	this.friction = 0.02
+
+	this.color = color
+
+	this.Step = function() {
+
+		this.x += this.x_speed
+		this.y += this.y_speed
+
+		this.x_speed = this.x_speed * (1 - this.friction)
+		this.y_speed = this.y_speed * (1 - this.friction)
+
+		if (abs(this.x_speed) < 0.1) { this.x_speed = 0 }
+		if (abs(this.y_speed) < 0.1) { this.y_speed = 0 }
+
+		this.Collision()
+	}
+
+	this.Draw = function() {
+		
+		fill(this.color)
+		stroke(this.color)
+		ellipse(this.x, this.y, this.size * 2, this.size * 2);
+	}
+
+	this.Collision = function() {
+		if ( this.x - this.size <= 0 ) { this.x_speed = abs(this.x_speed) }
+		if ( this.y - this.size <= 0 ) { this.y_speed = abs(this.y_speed) }
+
+		if ( this.x + this.size >= cwidth ) { this.x_speed = -abs(this.x_speed) }
+		if ( this.y + this.size >= cheight ) { this.y_speed = -abs(this.x_speed) }
+	}
+
+	this.BCollision = function(body) {
+		var x_distance = this.x - body.x
+		var y_distance = this.y - body.y
+
+		var distance = sqrt(x_distance^2 + y_distance^2)
+		var r_size = this.size + body.size
+
+		if (distance <= r_size) {
+			var dx_speed = this.x_speed - body.x_speed
+			var dy_speed = this.y_speed - body.y_speed
+
+			var dot = x_distance * dx_speed + y_distance * dy_speed
+
+			if (dot >= 0) {
+				var factor = dot / (distance^2)
+
+				this.x_speed += factor*x_distance
+				this.y_speed += factor*y_distance
+
+				body.x_speed -= factor*x_distance
+				body.y_speed -= factor*y_distance
 			}
 		}
 	}
